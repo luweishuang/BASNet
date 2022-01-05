@@ -256,19 +256,12 @@ class SalObjDataset(Dataset):
 		return len(self.image_name_list)
 
 	def __getitem__(self,idx):
-
-		# image = Image.open(self.image_name_list[idx])#io.imread(self.image_name_list[idx])
-		# label = Image.open(self.label_name_list[idx])#io.imread(self.label_name_list[idx])
-
 		image = io.imread(self.image_name_list[idx])
 
 		if(0==len(self.label_name_list)):
 			label_3 = np.zeros(image.shape)
 		else:
 			label_3 = io.imread(self.label_name_list[idx])
-
-		#print("len of label3")
-		#print(len(label_3.shape))
 		#print(label_3.shape)
 
 		label = np.zeros(label_3.shape[0:2])
@@ -283,18 +276,8 @@ class SalObjDataset(Dataset):
 			image = image[:,:,np.newaxis]
 			label = label[:,:,np.newaxis]
 
-		# #vertical flipping
-		# # fliph = np.random.randn(1)
-		# flipv = np.random.randn(1)
-		#
-		# if flipv>0:
-		# 	image = image[::-1,:,:]
-		# 	label = label[::-1,:,:]
-		# #vertical flip
-
 		sample = {'image':image, 'label':label}
 
 		if self.transform:
 			sample = self.transform(sample)
-
 		return sample

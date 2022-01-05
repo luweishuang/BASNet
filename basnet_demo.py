@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms#, utils
 # import torch.optim as optim
+
+import imgviz
 import numpy as np
 from PIL import Image
 import glob
 from data_loader import RescaleT
-from data_loader import CenterCrop
-from data_loader import ToTensor
 from data_loader import ToTensorLab
 from data_loader import SalObjDataset
 from model import BASNet
@@ -26,7 +26,7 @@ def normPRED(d):
 	return dn
 
 
-def save_output(image_name,pred,d_dir):
+def save_output(image_name, pred, d_dir):
 	predict = pred
 	predict = predict.squeeze()
 	predict_np = predict.cpu().data.numpy()
@@ -36,7 +36,8 @@ def save_output(image_name,pred,d_dir):
 	image = io.imread(image_name)
 	imo = im.resize((image.shape[1],image.shape[0]),resample=Image.BILINEAR)
 
-	pb_np = np.array(imo)
+	pb_np = np.array(imo.convert('L'), np.uint8)
+	pb_np = np.where(pb_np> 0, 1, 0)
 
 	aaa = img_name.split(".")
 	bbb = aaa[0:-1]
@@ -44,23 +45,28 @@ def save_output(image_name,pred,d_dir):
 	for i in range(1,len(bbb)):
 		imidx = imidx + "." + bbb[i]
 
+	viz = imgviz.label2rgb(pb_np, imgviz.rgb2gray(image), font_size=15, label_names=["bg", "wire"], loc="rb")
+	imgviz.io.imsave(image_name.replace("test_image", "test_vis"), viz)
+
+	imo = imo.convert('RGB')
 	imo.save(d_dir+imidx+'.png')
 
 
 if __name__ == '__main__':
 	# --------- 1. get image path and name ---------
-	
-	image_dir = './test_data/test_images/'
-	prediction_dir = './test_data/test_results/'
-	model_dir = './saved_models/basnet.pth'
-	
+	image_dir = './test_data/powerline/test_image/'
+	prediction_dir = './test_data/powerline/test_results/'
+	vis_dir = './test_data/powerline/test_vis/'
+	model_dir = './saved_models/basnet_bsi/basnet_bsi_itr_24000_train_1.912346_tar_0.103881.pth'
+
+
 	img_name_list = glob.glob(image_dir + '*.jpg')
-	
+
 	# --------- 2. dataloader ---------
 	#1. dataload
 	test_salobj_dataset = SalObjDataset(img_name_list = img_name_list, lbl_name_list = [],transform=transforms.Compose([RescaleT(256),ToTensorLab(flag=0)]))
 	test_salobj_dataloader = DataLoader(test_salobj_dataset, batch_size=1,shuffle=False,num_workers=1)
-	
+
 	# --------- 3. model define ---------
 	print("...load BASNet...")
 	net = BASNet(3,1)
@@ -68,27 +74,25 @@ if __name__ == '__main__':
 	if torch.cuda.is_available():
 		net.cuda()
 	net.eval()
-	
+
 	# --------- 4. inference for each image ---------
 	for i_test, data_test in enumerate(test_salobj_dataloader):
-	
 		print("inferencing:",img_name_list[i_test].split("/")[-1])
-	
+
 		inputs_test = data_test['image']
 		inputs_test = inputs_test.type(torch.FloatTensor)
-	
+
 		if torch.cuda.is_available():
 			inputs_test = Variable(inputs_test.cuda())
 		else:
 			inputs_test = Variable(inputs_test)
-	
+
 		d1,d2,d3,d4,d5,d6,d7,d8 = net(inputs_test)
-	
+
 		# normalization
 		pred = d1[:,0,:,:]
 		pred = normPRED(pred)
-	
+
 		# save results to test_results folder
 		save_output(img_name_list[i_test],pred,prediction_dir)
-	
 		del d1,d2,d3,d4,d5,d6,d7,d8
